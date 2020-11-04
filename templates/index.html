@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Последние обновления на сайте{% endblock %}
+{% block header %}Последние обновления на сайте{% endblock %}
+{% block content %}
+{% include "shared/menu.html" with index=True %}
+{% load cache %}
+{% cache 20 index_page %}
+{% for post in page %}
+{% include 'shared/post_item.html' with post=post %}
+{% if not forloop.last %}
+<hr>{% endif %}
+{% endfor %}
+{% endcache %}
+
+
+{% if page.has_other_pages %}
+{% include "shared/paginator.html" with items=page paginator=paginator%}
+{% endif %}
+
+{% endblock %}
