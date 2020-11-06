@@ -34,9 +34,8 @@ def profile(request, username):
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
 
-    for follow in author.following.all():
-        if follow.user == request.user:
-            following = True
+    if any(follow.user == request.user for follow in author.following.all()):
+        following = True
 
     following_count = author.following.count()
     followers_count = author.follower.count()
