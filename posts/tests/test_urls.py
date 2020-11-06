@@ -8,19 +8,12 @@ User = get_user_model()
 
 
 class StaticURLTests(TestCase):
-    # Метод класса должен быть декорирован
     @classmethod
     def setUpClass(cls):
-        # Вызываем родительский метод, чтобы не перезаписывать его полностью, а
-        # расширить
         super().setUpClass()
-        # Устанавливаем данные для тестирования
-        # Создаём пользователя
         cls.user = User.objects.create_user(username='StasBasov')
-        # Создаем клиент и авторизуем пользователя
         cls.authorized_client = Client()
         cls.authorized_client.force_login(cls.user)
-        # Создаём второй клиент, без авторизации
         cls.unauthorized_client = Client()
         cls.test_group = Group.objects.create(
             title='Лeв Толстой', slug='tolstoy', description='Тестовая группа')
@@ -42,7 +35,6 @@ class StaticURLTests(TestCase):
     check_urls = ViewTests.check_urls
 
     def test_homepage(self):
-        # Делаем запрос к главной странице и проверяем статус
         response = self.unauthorized_client.get('/')
         self.assertEqual(response.status_code, 200)
 
@@ -63,32 +55,18 @@ class StaticURLTests(TestCase):
         response = self.authorized_client.get('/new/')
         self.assertEqual(response.status_code, 200)
 
-    # Проверка доступности страницы /new/ для неавторизованного пользователя
     def test_unauthorized_user_newpage(self):
         response = self.unauthorized_client.get('/new/')
-        # Тестируем редирект: правильно ли идёт переадресация и правильный ли
-        # статус
         self.assertRedirects(response, '/auth/login/?next=/new/',
                              status_code=302, target_status_code=200)
 
     def test_signup_profile_exist(self):
-        # Проверяем существование страницы после регистрации
         response = self.authorized_client.get('/StasBasov/')
         self.assertEqual(response.status_code, 200)
 
     def test_404_page(self):
         response = self.authorized_client.get('/non-existent/')
         self.assertEqual(response.status_code, 404)
-
-    def test_upload_not_image_file(self):
-        with open('media/posts/test.txt', 'rb') as file:
-            self.authorized_client.post(
-                self.url_edit, {
-                    'text': 'Отредактированный текст',
-                    'group': self.test_group.id,
-                    'image': file
-                })
-        self.assertEqual(Post.objects.count(), self.posts_count)
 
     def test_new_post_unauthorized_user(self):
         self.unauthorized_client.post(

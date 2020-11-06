@@ -2,31 +2,25 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
 from posts.models import Post, Group
 from django.urls import reverse
-import time
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 User = get_user_model()
 
 
 class ViewTests(TestCase):
-    # Метод класса должен быть декорирован
     @classmethod
     def setUpClass(cls):
-        # Вызываем родительский метод, чтобы не перезаписывать его полностью, а
-        # расширить
         super().setUpClass()
-        # Устанавливаем данные для тестирования
-        # Создаём пользователя
         cls.user = User.objects.create_user(username='StasBasov')
         cls.second_user = User.objects.create_user(username='Trump')
-        cls.third_user = User.objects.create_user(username='Biden')
-        # Создаем клиент и авторизуем пользователя
+
         cls.authorized_client = Client()
         cls.authorized_client.force_login(cls.user)
         cls.unauthorized_client = Client()
 
-        cls.third_authorized_client = Client()
-        cls.third_authorized_client.force_login(cls.third_user)
+        cls.second_authorized_client = Client()
+        cls.second_authorized_client.force_login(cls.second_user)
 
         cls.test_group = Group.objects.create(
             title='Лeв Толстой', slug='tolstoy', description='Лёва Блогер')
@@ -73,7 +67,6 @@ class ViewTests(TestCase):
 
     def check_urls(self, text, post):
         cache.clear()
-        # Вспомогательная функция для прохода по урлам
         for url in self.urls(post):
             response = self.authorized_client.get(url)
             self.assertContains(response, text)
@@ -82,19 +75,12 @@ class ViewTests(TestCase):
             self.assertContains(response, text)
 
     def check_index_with_cache(self, text, post):
-        # Вспомогательная функция для прохода по урлам
         response = self.authorized_client.get(reverse('index'))
         self.assertNotContains(response, text)
         response = self.unauthorized_client.get(reverse('index'))
         self.assertNotContains(response, text)
-        time.sleep(21)
-        response = self.authorized_client.get(reverse('index'))
-        self.assertContains(response, text)
-        response = self.unauthorized_client.get(reverse('index'))
-        self.assertContains(response, text)
 
     def test_text_on_pages(self):
-        # Проверяем наличие текста созданного поста на страницах
         self.check_urls(self.test_post.text, self.test_post)
         self.authorized_client.post(
             self.url_edit,
@@ -112,13 +98,37 @@ class ViewTests(TestCase):
         self.assertContains(response, 'Смена группы')
 
     def test_img_on_pages(self):
-        with open('media/posts/tractor.jpg', 'rb') as img:
-            self.authorized_client.post(
+        small_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04'
+            b'\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02'
+            b'\x02\x4c\x01\x00\x3b'
+        )
+        uploaded = SimpleUploadedFile(
+            'small.gif', small_gif, content_type='image/gif')
+
+        self.authorized_client.post(
+            self.url_edit, {
+                'text': 'Отредактированный текст',
+                'group': self.test_group.id,
+                'image': uploaded,
+            })
+        self.check_urls('<img', self.test_post)
+
+    def test_upload_not_image_file(self):
+        with open('media/posts/test.txt', 'rb') as file:
+            response = self.authorized_client.post(
                 self.url_edit, {
                     'text': 'Отредактированный текст',
                     'group': self.test_group.id,
-                    'image': img})
-        self.check_urls('<img', self.test_post)
+                    'image': file,
+                })
+        self.assertFormError(
+            response,
+            'form',
+            "image",
+            'Загрузите правильное изображение. '
+            'Файл, который вы загрузили, '
+            'поврежден или не является изображением.')
 
     def test_cache_posts(self):
         self.authorized_client.post(
@@ -126,22 +136,37 @@ class ViewTests(TestCase):
             {'text': 'Это тест кэша', 'group': self.test_group.id},
             follow=True)
         self.check_index_with_cache('Это тест кэша', self.test_post)
+        self.check_urls('Это тест кэша', self.test_post)
 
-    def test_add_and_remove_follower_posts(self):
-        response = self.authorized_client.get(reverse('follow_index'))
-        self.assertNotContains(response, self.second_test_post.text)
+    def test_profile_follow(self):
+        followers_first_user = self.user.follower.count()
         self.authorized_client.get(reverse(
             'profile_follow', kwargs={'username': self.second_user.username}))
-        response = self.authorized_client.get(reverse('follow_index'))
-        self.assertContains(response, self.second_test_post.text)
+        self.assertEqual(self.user.follower.count(), followers_first_user + 1)
+
+    def test_profile_unfollow(self):
         self.authorized_client.get(
             reverse(
                 'profile_unfollow', kwargs={
                     'username': self.second_user.username}))
         response = self.authorized_client.get(reverse('follow_index'))
         self.assertNotContains(response, self.second_test_post.text)
-        response = self.third_authorized_client.get(reverse('follow_index'))
-        self.assertNotContains(response, self.second_test_post.text)
+
+    def test_add_new_post_to_followers(self):
+        self.authorized_client.get(reverse(
+            'profile_follow', kwargs={'username': self.second_user.username}))
+        self.second_authorized_client.post(
+            reverse('new_post'),
+            {'text': 'Это текст публикации второго пользователя',
+                'group': self.test_group.id},
+            follow=True)
+        response = self.authorized_client.get(reverse('follow_index'))
+        self.assertContains(
+            response, 'Это текст публикации второго пользователя')
+
+        response = self.second_authorized_client.get(reverse('follow_index'))
+        self.assertNotContains(
+            response, 'Это текст публикации второго пользователя')
 
     def test_authorized_user_add_comment(self):
         self.authorized_client.post(

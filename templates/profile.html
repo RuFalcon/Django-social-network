@@ -10,14 +10,14 @@
 
                 <div class="col-md-9">
                         {% for post in page %}
-                        <!-- Начало блока с отдельным постом -->
+
                         {% include 'shared/post_item.html' with post=post %}
                         {% endfor %}
-                        <!-- Конец блока с отдельным постом -->
 
 
 
-                        <!-- Здесь постраничная навигация паджинатора -->
+
+
                         {% if page.has_other_pages %}
                         {% include "shared/paginator.html" with items=page paginator=paginator%}
                         {% endif %}
