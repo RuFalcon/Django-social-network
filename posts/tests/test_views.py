@@ -52,6 +52,8 @@ class ViewTests(TestCase):
                 'username': cls.user.username,
                 'post_id': cls.test_post.id})
 
+        cls.followers_first_user = cls.user.follower.count()
+
     def urls(self, post):
         main_page = reverse('index')
         profile_page = reverse(
@@ -79,6 +81,11 @@ class ViewTests(TestCase):
         self.assertNotContains(response, text)
         response = self.unauthorized_client.get(reverse('index'))
         self.assertNotContains(response, text)
+        cache.clear()
+        response = self.authorized_client.get(reverse('index'))
+        self.assertContains(response, text)
+        response = self.unauthorized_client.get(reverse('index'))
+        self.assertContains(response, text)
 
     def test_text_on_pages(self):
         self.check_urls(self.test_post.text, self.test_post)
@@ -136,13 +143,13 @@ class ViewTests(TestCase):
             {'text': 'Это тест кэша', 'group': self.test_group.id},
             follow=True)
         self.check_index_with_cache('Это тест кэша', self.test_post)
-        self.check_urls('Это тест кэша', self.test_post)
 
     def test_profile_follow(self):
-        followers_first_user = self.user.follower.count()
         self.authorized_client.get(reverse(
             'profile_follow', kwargs={'username': self.second_user.username}))
-        self.assertEqual(self.user.follower.count(), followers_first_user + 1)
+        self.assertEqual(
+            self.user.follower.count(),
+            self.followers_first_user + 1)
 
     def test_profile_unfollow(self):
         self.authorized_client.get(
@@ -151,8 +158,9 @@ class ViewTests(TestCase):
                     'username': self.second_user.username}))
         response = self.authorized_client.get(reverse('follow_index'))
         self.assertNotContains(response, self.second_test_post.text)
+        self.assertEqual(self.user.follower.count(), self.followers_first_user)
 
-    def test_add_new_post_to_followers(self):
+    def test_view_post_with_follow(self):
         self.authorized_client.get(reverse(
             'profile_follow', kwargs={'username': self.second_user.username}))
         self.second_authorized_client.post(
@@ -164,6 +172,12 @@ class ViewTests(TestCase):
         self.assertContains(
             response, 'Это текст публикации второго пользователя')
 
+    def test_view_post_without_follow(self):
+        self.second_authorized_client.post(
+            reverse('new_post'),
+            {'text': 'Это текст публикации второго пользователя',
+                'group': self.test_group.id},
+            follow=True)
         response = self.second_authorized_client.get(reverse('follow_index'))
         self.assertNotContains(
             response, 'Это текст публикации второго пользователя')
