@@ -25,11 +25,16 @@ SECRET_KEY = '+goa9xcfil#@v1u4$3k_#&4fcb)&shoqgl3m9%@r+7(($v@%%6'
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "[::1]",
-    "testserver",
+    "*",
+    # "localhost",
+    # "127.0.0.1",
+    # "[::1]",
+    # "testserver",
 ]
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+] 
 
 
 # Application definition
@@ -46,9 +51,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "debug_toolbar",
 ]
 
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -56,6 +63,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    
 ]
 
 ROOT_URLCONF = 'yatube.urls'

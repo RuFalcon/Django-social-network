@@ -35,7 +35,7 @@ def profile(request, username):
     page = paginator.get_page(page_number)
 
     if request.user.is_authenticated and Follow.objects.filter(
-            user=request.user, autho=author).exists():
+            user=request.user, author=author).exists():
         following = True
 
     following_count = author.following.count()
@@ -58,7 +58,7 @@ def post_view(request, username, post_id):
     form = CommentForm()
 
     following = False
-
+    
     if request.user.is_authenticated and Follow.objects.filter(
             user=request.user, author=author).exists():
         following = True
@@ -169,8 +169,7 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    if author != request.user and not Follow.objects.filter(
-            author__username=username, user=request.user):
+    if author != request.user:
         Follow.objects.get_or_create(author=author, user=request.user)
     return redirect('profile', username=username)
 
